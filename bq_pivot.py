@@ -5,7 +5,7 @@ class BqPivot():
     Class to generate a SQL query which creates pivoted tables in BigQuery.
     """
     def __init__(self, data, index_col, pivot_col, values_col, agg_func="sum",
-                 table_name=None, custom_agg_func=None, prefix=None, suffix=None):
+                 table_name=None, not_eq_default="0", custom_agg_func=None, prefix=None, suffix=None):
         """
         blah blah
         """
@@ -15,6 +15,7 @@ class BqPivot():
         self.values_col = values_col
         self.pivot_col = pivot_col
 
+        self.not_eq_default = not_eq_default
         self.table_name = self._get_table_name(table_name)
 
         self.piv_col_vals = self._get_piv_col_vals(data)
@@ -48,4 +49,36 @@ class BqPivot():
 
         return piv_col_names
 
+    def _add_select_statement(self):
 
+        query = "select " + "".join([index_col + ", " for index_col in self.index_col]) + "\n"
+        return query
+
+    def _add_case_statement(self):
+        
+        case_query = self.function.format("case when {0} = \"{1}\" then {2} else {3} end") + " as {4},\n"
+
+        query = "".join([case_query.format(self.pivot_col, piv_col_val, self.values_col,
+                                           self.not_eq_default, piv_col_name)
+                         for piv_col_val, piv_col_name in zip(self.piv_col_vals, self.piv_col_names)])
+        
+        query = query[:-2] + "\n"
+        return query
+
+    def _add_from_statement(self):
+
+        query =  "from {0}\n".format(self.table_name)
+        return query
+
+    def _add_group_by_statement(self):
+
+        query = "group by " + "".join(["{0},".format(x) for x in range(1, len(self.index_col) + 1)])
+        return query[:-1]
+
+    def generate_query(self):
+        self.query = self._add_select_statement() +\
+                     self._add_case_statement() +\
+                     self._add_from_statement() +\
+                     self._add_group_by_statement()
+
+        return self.query
