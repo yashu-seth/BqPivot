@@ -8,7 +8,8 @@ class BqPivot():
     Class to generate a SQL query which creates pivoted tables in BigQuery.
     """
     def __init__(self, data, index_col, pivot_col, values_col, agg_func="sum",
-                 table_name=None, not_eq_default="0", custom_agg_func=None, prefix=None, suffix=None):
+                 table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_func=None,
+                 prefix=None, suffix=None):
         """
         blah blah
         """
@@ -22,7 +23,7 @@ class BqPivot():
         self.table_name = self._get_table_name(table_name)
 
         self.piv_col_vals = self._get_piv_col_vals(data)
-        self.piv_col_names = self._create_piv_col_names(pivot_col, prefix, suffix)
+        self.piv_col_names = self._create_piv_col_names(pivot_col, add_col_nm_suffix, prefix, suffix)
         
         self.function = custom_agg_func if custom_agg_func else agg_func + "({})"
 
@@ -50,13 +51,17 @@ class BqPivot():
         # make all characters lower case
         return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower()
 
-    def _create_piv_col_names(self, pivot_col, prefix, suffix):
+    def _create_piv_col_names(self, pivot_col, add_col_nm_suffix, prefix, suffix):
 
         prefix = prefix + "_" if prefix else ""
         suffix = "_" + suffix if suffix else ""
 
-        piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), pivot_col.lower(), suffix)
-                         for piv_col_val in self.piv_col_vals]
+        if add_col_nm_suffix:
+            piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), pivot_col.lower(), suffix)
+                             for piv_col_val in self.piv_col_vals]
+        else:
+            piv_col_names = ["{0}{1}{2}".format(prefix, self._clean_col_name(piv_col_val), suffix)
+                             for piv_col_val in self.piv_col_vals]
 
         return piv_col_names
 
