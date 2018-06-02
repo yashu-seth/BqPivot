@@ -47,7 +47,8 @@ class BqPivot():
         # replace spaces with underscores
         # remove non alpha numeric characters other than underscores
         # replace multiple consecutive underscores with one underscore
-        return re.sub("+_", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name)))
+        # make all characters lower case
+        return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower()
 
     def _create_piv_col_names(self, pivot_col, prefix, suffix):
 
