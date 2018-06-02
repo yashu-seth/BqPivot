@@ -1,4 +1,7 @@
+import re
+
 import pandas as pd
+
 
 class BqPivot():
     """
@@ -38,13 +41,19 @@ class BqPivot():
             raise ValueError("Provided data must be a pandas dataframe or a csv file path.")
 
         return self.data[self.pivot_col].unique().tolist()
+    
+    def _clean_col_name(self, col_name):
+        
+        # replace spaces with underscores
+        # remove non alpha numeric characters other than underscores
+        return re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))
 
     def _create_piv_col_names(self, pivot_col, prefix, suffix):
 
         prefix = prefix + "_" if prefix else ""
         suffix = "_" + suffix if suffix else ""
 
-        piv_col_names = ["{0}{1}_{2}{3}".format(prefix, piv_col_val, pivot_col.lower(), suffix)
+        piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), pivot_col.lower(), suffix)
                          for piv_col_val in self.piv_col_vals]
 
         return piv_col_names
