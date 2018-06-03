@@ -11,7 +11,59 @@ class BqPivot():
                  table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_func=None,
                  prefix=None, suffix=None):
         """
-        blah blah
+        Parameters
+        ----------
+
+        data: pandas.core.frame.DataFrame or string
+            The input data can either be a pandas dataframe or a string path to the pandas
+            data frame. The only requirement of this data is that it must have the column
+            on which the pivot it to be done.
+
+        index_col: list
+            The names of the index columns in the query (the columns on which the group by needs to be performed)
+
+        pivot_col: string
+            The name of the column on which the pivot needs to be done.
+
+        values_col: string
+            The name of the column on which aggregation needs to be performed.
+
+        agg_func: string
+            The name of sql aggregation function.
+
+        table_name: string
+            The name of the table in the query.
+
+        not_eq_default: numeric, optional
+            The value to take when the case when statement is not satisfied. For example,
+            if one is doing a sum aggregation on the value column then the not_eq_default should
+            be equal to 0. Because the case statement part of the sql query would look like - 
+            
+            ... ...
+            sum(case when <pivot_col> = <some_pivot_col_value> then values_col else 0)
+            ... ...
+
+            Similarly if the aggregation function is min then the not_eq_default should be
+            positive infinity.
+
+        add_col_nm_suffix: boolean, optional
+            If True, then the original pivot column name will be added as suffix in the new 
+            pivoted columns.
+
+        custom_agg_func: string, optional
+            Can be used if one wants to give customized aggregation function. The values col name 
+            should be replaced with {}. For example, if we want an aggregation function like - 
+            sum(coalesce(values_col, 0)) then the custom_agg_func argument would be - 
+            sum(coalesce({}, 0)). 
+            If provided this would be override the agg_func argument.
+
+        prefix: string, optional
+            A fixed string to add as a prefix in the pivoted column names separated by an
+            underscore.
+
+        suffix: string, optional
+            A fixed string to add as a suffix in the pivoted column names spearated by an
+            underscore.        
         """
         self.query = ""
 
@@ -28,11 +80,14 @@ class BqPivot():
         self.function = custom_agg_func if custom_agg_func else agg_func + "({})"
 
     def _get_table_name(self, table_name):
+        """
+        Returns the table name or a placeholder if the table name is not provided.
+        """
         return table_name if table_name else "<--insert-table-name-here-->"
 
     def _get_piv_col_vals(self, data):
         """
-        pass
+        Gets all the unique values of the pivot column.
         """
         if isinstance(data, pd.DataFrame):
             self.data = data
@@ -41,9 +96,19 @@ class BqPivot():
         else:
             raise ValueError("Provided data must be a pandas dataframe or a csv file path.")
 
+        if self.pivot_col not in self.data.columns:
+            raise ValueError("The provided data must have the column on which pivot is to be done. "\
+                             "Also make sure that the column name in the data is same as the name "\
+                             "provided to the pivot_col parameter.")
+
         return self.data[self.pivot_col].unique().tolist()
     
     def _clean_col_name(self, col_name):
+        """
+        The pivot column values can have arbitrary strings but in order to 
+        convert them to column names some cleaning is required. This method 
+        takes a string as input and returns a clean column name.
+        """
         
         # replace spaces with underscores
         # remove non alpha numeric characters other than underscores
@@ -52,7 +117,9 @@ class BqPivot():
         return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower()
 
     def _create_piv_col_names(self, pivot_col, add_col_nm_suffix, prefix, suffix):
-
+        """
+        The method created a list of pivot column names of the new pivoted table.
+        """
         prefix = prefix + "_" if prefix else ""
         suffix = "_" + suffix if suffix else ""
 
@@ -66,12 +133,16 @@ class BqPivot():
         return piv_col_names
 
     def _add_select_statement(self):
-
+        """
+        Adds the select statement part of the query.
+        """
         query = "select " + "".join([index_col + ", " for index_col in self.index_col]) + "\n"
         return query
 
     def _add_case_statement(self):
-        
+        """
+        Adds the case statement part of the query.
+        """
         case_query = self.function.format("case when {0} = \"{1}\" then {2} else {3} end") + " as {4},\n"
 
         query = "".join([case_query.format(self.pivot_col, piv_col_val, self.values_col,
@@ -82,16 +153,23 @@ class BqPivot():
         return query
 
     def _add_from_statement(self):
-
+        """
+        Adds the from statement part of the query.
+        """
         query =  "from {0}\n".format(self.table_name)
         return query
 
     def _add_group_by_statement(self):
-
+        """
+        Adds the group by part of the query.
+        """
         query = "group by " + "".join(["{0},".format(x) for x in range(1, len(self.index_col) + 1)])
         return query[:-1]
 
     def generate_query(self):
+        """
+        Returns the query to create the pivoted table.
+        """
         self.query = self._add_select_statement() +\
                      self._add_case_statement() +\
                      self._add_from_statement() +\
