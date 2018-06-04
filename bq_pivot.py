@@ -29,7 +29,7 @@ class BqPivot():
             The name of the column on which aggregation needs to be performed.
 
         agg_func: string
-            The name of sql aggregation function.
+            The name of the sql aggregation function.
 
         table_name: string
             The name of the table in the query.
