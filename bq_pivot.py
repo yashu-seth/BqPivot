@@ -75,7 +75,7 @@ class BqPivot():
             positive infinity.
 
         add_col_nm_suffix: boolean, optional
-            If True, then the original pivot column name will be added as suffix in the new 
+            If True, then the original values column name will be added as suffix in the new 
             pivoted columns.
 
         custom_agg_fun: string, optional
@@ -90,7 +90,7 @@ class BqPivot():
             underscore.
 
         suffix: string, optional
-            A fixed string to add as a suffix in the pivoted column names spearated by an
+            A fixed string to add as a suffix in the pivoted column names separated by an
             underscore.        
         """
         self.query = ""
