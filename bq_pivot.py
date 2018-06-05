@@ -103,7 +103,7 @@ class BqPivot():
         self.table_name = self._get_table_name(table_name)
 
         self.piv_col_vals = self._get_piv_col_vals(data)
-        self.piv_col_names = self._create_piv_col_names(pivot_col, add_col_nm_suffix, prefix, suffix)
+        self.piv_col_names = self._create_piv_col_names(add_col_nm_suffix, prefix, suffix)
         
         self.function = custom_agg_func if custom_agg_func else agg_func + "({})"
 
@@ -145,7 +145,7 @@ class BqPivot():
         # remove trailing underscores
         return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower().rstrip("_")
 
-    def _create_piv_col_names(self, pivot_col, add_col_nm_suffix, prefix, suffix):
+    def _create_piv_col_names(self, add_col_nm_suffix, prefix, suffix):
         """
         The method created a list of pivot column names of the new pivoted table.
         """
@@ -153,7 +153,7 @@ class BqPivot():
         suffix = "_" + suffix if suffix else ""
 
         if add_col_nm_suffix:
-            piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), pivot_col.lower(), suffix)
+            piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), self.values_col.lower(), suffix)
                              for piv_col_val in self.piv_col_vals]
         else:
             piv_col_names = ["{0}{1}{2}".format(prefix, self._clean_col_name(piv_col_val), suffix)
