@@ -35,8 +35,8 @@ class BqPivot():
     group by 1,2,3
     
     """
-    def __init__(self, data, index_col, pivot_col, values_col, agg_func="sum",
-                 table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_func=None,
+    def __init__(self, data, index_col, pivot_col, values_col, agg_fun="sum",
+                 table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_fun=None,
                  prefix=None, suffix=None):
         """
         Parameters
@@ -56,7 +56,7 @@ class BqPivot():
         values_col: string
             The name of the column on which aggregation needs to be performed.
 
-        agg_func: string
+        agg_fun: string
             The name of the sql aggregation function.
 
         table_name: string
@@ -78,12 +78,12 @@ class BqPivot():
             If True, then the original pivot column name will be added as suffix in the new 
             pivoted columns.
 
-        custom_agg_func: string, optional
+        custom_agg_fun: string, optional
             Can be used if one wants to give customized aggregation function. The values col name 
             should be replaced with {}. For example, if we want an aggregation function like - 
-            sum(coalesce(values_col, 0)) then the custom_agg_func argument would be - 
+            sum(coalesce(values_col, 0)) then the custom_agg_fun argument would be - 
             sum(coalesce({}, 0)). 
-            If provided this would override the agg_func argument.
+            If provided this would override the agg_fun argument.
 
         prefix: string, optional
             A fixed string to add as a prefix in the pivoted column names separated by an
@@ -105,7 +105,7 @@ class BqPivot():
         self.piv_col_vals = self._get_piv_col_vals(data)
         self.piv_col_names = self._create_piv_col_names(add_col_nm_suffix, prefix, suffix)
         
-        self.function = custom_agg_func if custom_agg_func else agg_func + "({})"
+        self.function = custom_agg_fun if custom_agg_fun else agg_fun + "({})"
 
     def _get_table_name(self, table_name):
         """
