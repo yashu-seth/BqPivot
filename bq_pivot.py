@@ -129,7 +129,7 @@ class BqPivot():
                              "Also make sure that the column name in the data is same as the name "\
                              "provided to the pivot_col parameter.")
 
-        return self.data[self.pivot_col].unique().tolist()
+        return self.data[self.pivot_col].astype(str).unique().tolist()
     
     def _clean_col_name(self, col_name):
         """
