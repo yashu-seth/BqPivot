@@ -6,6 +6,34 @@ import pandas as pd
 class BqPivot():
     """
     Class to generate a SQL query which creates pivoted tables in BigQuery.
+
+    Example
+    -------
+
+    The following example uses the kaggle's titanic data. It can be found here -
+    `https://www.kaggle.com/c/titanic/data`
+
+    This data is only 60 KB and it has been used for a demonstration purpose.
+    This module comes particularly handy with huge datasets for which we would need
+    BigQuery(https://en.wikipedia.org/wiki/BigQuery).
+
+    >>> from bq_pivot import BqPivot
+    >>> import pandas as pd
+    >>> data = pd.read_csv("titanic.csv").head()
+    >>> gen = BqPivot(data=data, index_col=["Pclass", "Survived", "PassengenId"],
+                      pivot_col="Name", values_col="Age",
+                      add_col_nm_suffix=False)
+    >>> print(gen.generate_query())
+
+    select Pclass, Survived, PassengenId, 
+    sum(case when Name = "Braund, Mr. Owen Harris" then Age else 0 end) as braund_mr_owen_harris,
+    sum(case when Name = "Cumings, Mrs. John Bradley (Florence Briggs Thayer)" then Age else 0 end) as cumings_mrs_john_bradley_florence_briggs_thayer,
+    sum(case when Name = "Heikkinen, Miss. Laina" then Age else 0 end) as heikkinen_miss_laina,
+    sum(case when Name = "Futrelle, Mrs. Jacques Heath (Lily May Peel)" then Age else 0 end) as futrelle_mrs_jacques_heath_lily_may_peel,
+    sum(case when Name = "Allen, Mr. William Henry" then Age else 0 end) as allen_mr_william_henry
+    from <--insert-table-name-here-->
+    group by 1,2,3
+    
     """
     def __init__(self, data, index_col, pivot_col, values_col, agg_func="sum",
                  table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_func=None,
@@ -55,7 +83,7 @@ class BqPivot():
             should be replaced with {}. For example, if we want an aggregation function like - 
             sum(coalesce(values_col, 0)) then the custom_agg_func argument would be - 
             sum(coalesce({}, 0)). 
-            If provided this would be override the agg_func argument.
+            If provided this would override the agg_func argument.
 
         prefix: string, optional
             A fixed string to add as a prefix in the pivoted column names separated by an
@@ -114,7 +142,8 @@ class BqPivot():
         # remove non alpha numeric characters other than underscores
         # replace multiple consecutive underscores with one underscore
         # make all characters lower case
-        return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower()
+        # remove trailing underscores
+        return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower().rstrip("_")
 
     def _create_piv_col_names(self, pivot_col, add_col_nm_suffix, prefix, suffix):
         """
@@ -176,3 +205,11 @@ class BqPivot():
                      self._add_group_by_statement()
 
         return self.query
+
+    def write_query(self, output_file):
+        """
+        Writes the query to a text file.
+        """
+        text_file = open(output_file, "w")
+        text_file.write(self.generate_query())
+        text_file.close()
