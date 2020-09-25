@@ -2,7 +2,7 @@
 
 #### Google BigQuery Pivot in Python  
  
-Provides a class capable of generating a pivot querying using the 'Fast Pivot' implementation, which is capable of distributing work jobs to BigQuery clusters. 'Fast Pivot' provides a roughly 10x decrease in runtime compared to the more accessible repeat(sum(case)) style of pivot. 
+Provides a class capable of generating a pivot query using the 'Fast Pivot' implementation, which is capable of distributing work jobs to BigQuery clusters. 'Fast Pivot' provides a roughly 10x improvement in runtime compared to the more accessible style of pivot. 
 
 However, the current work would not be possible without the previous version. Credit to Yashu-Seth for implementing the original class with the traditional BigQuery Pivot. For an introduction into how that works, see [How to pivot large tables in BigQuery?](https://yashuseth.blog/2018/06/06/how-to-pivot-large-tables-in-bigquery/).
 

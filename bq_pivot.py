@@ -86,7 +86,7 @@ class BqPivot():
 
         self.query = ""
 
-        self.index_col = list(index_col)
+        self.index_col = index_col
         self.values_col = values_col
         self.pivot_col = pivot_col
 
