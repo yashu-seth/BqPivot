@@ -31,16 +31,12 @@ class BqPivot():
 
     """
 
-    def __init__(self, data, index_col, pivot_col, values_col, agg_fun="sum",
+    def __init__(self, index_col, pivot_col, values_col, agg_fun="sum", data=None,
                  table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_fun=None,
                  prefix=None, suffix=None):
         """
         Parameters
         ----------
-        data: pandas.core.frame.DataFrame or string
-            The input data can either be a pandas dataframe or a string path to the pandas
-            data frame. The only requirement of this data is that it must have the column
-            on which the pivot it to be done.
         index_col: list
             The names of the index columns in the query (the columns on which the group by needs to be performed)
         pivot_col: string
@@ -49,8 +45,15 @@ class BqPivot():
             The name or names of the columns on which aggregation needs to be performed.
         agg_fun: string
             The name of the sql aggregation function.
+        data: pandas.core.frame.DataFrame or string
+            The input data can either be a pandas dataframe or a string path to the pandas
+            data frame. The only requirement of this data is that it must have the column
+            on which the pivot it to be done. If data is not provided the __init__ call will
+            automatically query the table_name provided to get distinct pivot column values. 
+            **Must provide one of data or table_name**
         table_name: string
             The name of the table in the query.
+            **Must provide one of data or table_name**
         not_eq_default: numeric, optional
             The value to take when the case when statement is not satisfied. For example,
             if one is doing a sum aggregation on the value column then the not_eq_default should
@@ -77,6 +80,9 @@ class BqPivot():
             A fixed string to add as a suffix in the pivoted column names separated by an
             underscore.
         """
+        if data == None and table_name == None:
+            raise ValueError("At least one of data or table_name must be provided.")
+
         self.query = ""
 
         self.index_col = list(index_col)
@@ -84,9 +90,14 @@ class BqPivot():
         self.pivot_col = pivot_col
 
         self.not_eq_default = not_eq_default
-        self.table_name = self._get_table_name(table_name)
 
-        self.piv_col_vals = self._get_piv_col_vals(data)
+        if data is None:
+            self.table_name = table_name
+            self.piv_col_vals = self._query_piv_col_vals()
+        elif data:
+            self.piv_col_vals = self._get_piv_col_vals(data)
+            self.table_name = self._get_table_name(table_name)
+
         if type(self.values_col) == str:
             self.piv_col_names = self._create_piv_col_names(add_col_nm_suffix, prefix, suffix)
         elif type(self.values_col) == list:
@@ -101,6 +112,13 @@ class BqPivot():
         Returns the table name or a placeholder if the table name is not provided.
         """
         return table_name if table_name else "<--insert-table-name-here-->"
+
+    def _query_piv_col_vals(self):
+        '''
+        Queries the distinct values in the pivot col directly from the table_name provided.
+        '''
+        return pd.read_gbq(f'SELECT DISTINCT({self.pivot_col}) FROM {self.table_name}')[self.pivot_col].astype(
+            str).to_list()
 
     def _get_piv_col_vals(self, data):
         """
@@ -217,3 +235,11 @@ class BqPivot():
             text_file = open(output_file, "w")
             text_file.write(self.generate_query())
             text_file.close()
+
+    def submit_query(self, **kwargs):
+        '''
+        Submits the query and returns the results.
+        '''
+        if self.query == "":
+            self.generate_query()
+        return pd.read_gbq(self.query)
