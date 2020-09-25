@@ -207,11 +207,11 @@ class BqPivot():
 
         return self.query
 
-    def write_query(self, debug=False):  # , output_file):
+    def write_query(self, output_file=None):
         """
-        Writes the query to a text file, or prints the query to the console if debug = True.
+        Writes the query to a text file if output_file is passed, or prints the query to the console.
         """
-        if debug == True:
+        if output_file == None:
             print(self.generate_query())
         else:
             text_file = open(output_file, "w")
