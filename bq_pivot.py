@@ -1,6 +1,7 @@
 import re
-
 import pandas as pd
+import sys
+from google.cloud import bigquery, storage
 
 
 class BqPivot():
@@ -31,8 +32,8 @@ class BqPivot():
 
     """
 
-    def __init__(self, index_col, pivot_col, values_col, agg_fun="sum", data=None,
-                 table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_fun=None,
+    def __init__(self, index_col, pivot_col, values_col, table_name=None, data=None,
+                 agg_fun="sum", not_eq_default="0", add_col_nm_suffix=True, custom_agg_fun=None,
                  prefix=None, suffix=None):
         """
         Parameters
@@ -49,7 +50,7 @@ class BqPivot():
             The input data can either be a pandas dataframe or a string path to the pandas
             data frame. The only requirement of this data is that it must have the column
             on which the pivot it to be done. If data is not provided the __init__ call will
-            automatically query the table_name provided to get distinct pivot column values. 
+            automatically query the table_name provided to get distinct pivot column values.
             **Must provide one of data or table_name**
         table_name: string
             The name of the table in the query.
@@ -225,21 +226,131 @@ class BqPivot():
 
         return self.query
 
-    def write_query(self, output_file=None):
+    def write_query(self, output_file=None, verbose=False):
         """
         Writes the query to a text file if output_file is passed, or prints the query to the console.
         """
-        if output_file == None:
-            print(self.generate_query())
-        else:
+        self.generate_query()
+        if verbose:
+            print(self.query)
+        if output_file is not None:
             text_file = open(output_file, "w")
             text_file.write(self.generate_query())
             text_file.close()
 
-    def submit_query(self, **kwargs):
+    def submit_pandas_query(self, **kwargs):
         '''
         Submits the query and returns the results.
         '''
         if self.query == "":
             self.generate_query()
         return pd.read_gbq(self.query)
+
+    def write_permanent_table(self, destination_table):
+        job_config = bigquery.QueryJobConfig(
+                                            allow_large_results=True,
+                                            destination=destination_table,
+                                            use_legacy_sql=True
+                                                                )
+
+        sql = self.query()
+
+        # Start the query, passing in the extra configuration.
+        query_job = client.query(sql, job_config=job_config)  # Make an API request.
+        query_job.result()  # Wait for the job to complete.
+
+        print("Query results loaded to the table {}".format(table_id))
+
+    #def write_temporary_table(self):
+
+
+    def query_control(self, destination_table=None, local_file=None, temp_table=False):
+        if local_file is not None:
+            self.submit_pandas_query().to_csv(local_file)
+        if destination_table is not None:
+            self.write_permanant_table(destination_table)
+        elif temp_table == True:
+            self.write_temp_table()
+        else:
+            print('Final query not submitted to BigQuery. Would you like to do so now? Y/n')
+            answer = input()
+            if answer == 'Y' or answer == 'y':
+                print('Options: \nLocal file: l\nPermanent BigQuery table: b\nTemperary BigQuery table: t')
+                answer= input()
+                if answer == 'l':
+                    print('Local file write path: ')
+                    local_file = input()
+                    self.submit_pandas_query.to_csv(local_file)
+                elif answer == 'b':
+                    print('BigQuery table destination: ')
+                    self.write_permanant_table(destination_table)
+                    destination_table=None
+                elif answer == 't':
+                    temp_table=True
+                    self.write_temp_table()
+
+
+
+if __name__ == "__main__":
+    arguments = {'--output_file':None,
+                 '--table_name':None,
+                 '--index_col':None,
+                 '--pivot_col':None,
+                 '--values_col':None,
+                 '--data':None,
+                 '--agg_fun':"sum",
+                 '--not_eq_default':"0",
+                 '--add_col_nm_suffix':True,
+                 '--custom_agg_fun':None,
+                 '--prefix':None,
+                 '--suffix':None,
+                 '--verbose':False,
+                 '--destination_table':None,
+                 '--local_file':None,
+                 '--temp_table':False}
+
+    if '--help' in sys.argv:
+        print('(Unofficial) Google BigQuery Python Pivot Script: BigPivot\n')
+        print('Commands available: \n')
+        print("".join([arg + ' \n' for arg in arguments]))
+        print('Ex. python bq_pivot.py --index_col id --pivot_col class --values_col values --table_name my-project-id:my-dataset:my-table')
+        print('\nIf you would like to run your query pass `--destination_table my-project-id:my-dataset:my-table` or `--temp_table True`')
+        print('\nAlternatively, to run the query and download the result to a csv using pd.read_gbq, pass `--local_file path/to/file`')
+        print('\n\nAdditionally, please make sure you set your GOOGLE_APPLICATION_CREDENTIALS using')
+        print('export GOOGLE_APPLICATION_CREDENTIALS=\'path/to/creds.json\'')
+        exit()
+
+    vn = len(sys.argv)
+    if vn < 9:
+        raise ValueError("The following arguments are required when entering from the Command Line: \nindex_col\npivot_col\nvalues_col\ntable_name\n\
+                            If you only intend to construct the query locally, pass None for table_name and the path of a data file to read.")
+    for arg_name in arguments:
+        if arg_name in sys.argv:
+            arguments[arg_name] = sys.argv[sys.argv.index(arg_name) + 1]
+
+    bq_client = bigquery.Client()
+    storage_client = storage.Client()
+
+    gbqPivot = BqPivot(index_col=[arguments['--index_col']],
+                       pivot_col=arguments['--pivot_col'],
+                       values_col=arguments['--values_col'],
+                       table_name=arguments['--table_name'],
+                       data=arguments['--data'],
+                       agg_fun=arguments['--agg_fun'],
+                       not_eq_default=arguments['--not_eq_default'],
+                       add_col_nm_suffix=arguments['--add_col_nm_suffix'],
+                       custom_agg_fun=arguments['--custom_agg_fun'],
+                       prefix=arguments['--prefix'],
+                       suffix=arguments['--suffix'])
+
+    gbqPivot.write_query(output_file=arguments['--output_file'], verbose=arguments['--verbose'])
+
+    gbqPivot.query_control(destination_table=arguments['--destination_table'],
+                           local_file=arguments['--local_file'],
+                           temp_table=arguments['--temp_table'])
+
+
+
+
+
+
