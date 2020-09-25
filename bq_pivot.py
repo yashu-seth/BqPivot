@@ -174,86 +174,86 @@ class BqPivot():
 
         return piv_col_names
 
-        def _create_ord_col_names(self):
-            '''
-            Create sanitized base ordinal names for each piv_col_val.
-            '''
+    def _create_ord_col_names(self):
+        '''
+        Create sanitized base ordinal names for each piv_col_val.
+        '''
 
-            ord_col_names = ["{}_".format(self._clean_col_name(piv_col_val))
-                             for piv_col_val in self.piv_col_vals]
-            return ord_col_names
+        ord_col_names = ["{}_".format(self._clean_col_name(piv_col_val))
+                         for piv_col_val in self.piv_col_vals]
+        return ord_col_names
 
-        def _write_wide_ranked(self):
-            '''
-            Writes a 'wide_ranked' table
+    def _write_wide_ranked(self):
+        '''
+        Writes a 'wide_ranked' table
 
-            To do: substitue the current piv_col_names for ordinal_piv_col_names like "ALL_" instead of "ALL_size"
-            This also applies to _write_table_join in the ordinal() call
-            '''
+        To do: substitue the current piv_col_names for ordinal_piv_col_names like "ALL_" instead of "ALL_size"
+        This also applies to _write_table_join in the ordinal() call
+        '''
 
-            query = 'WITH wide_ranked AS ( \nSELECT '
-            query = query + "".join(["ANY_VALUE(IF({} = '{}', rank, null)) as {},\n".format(self.pivot_col,
-                                                                                            pivot_col_val,
-                                                                                            ord_col_name)
-                                     for pivot_col_val, ord_col_name in zip(self.piv_col_vals, self.ord_col_names)])
+        query = 'WITH wide_ranked AS ( \nSELECT '
+        query = query + "".join(["ANY_VALUE(IF({} = '{}', rank, null)) as {},\n".format(self.pivot_col,
+                                                                                        pivot_col_val,
+                                                                                        ord_col_name)
+                                 for pivot_col_val, ord_col_name in zip(self.piv_col_vals, self.ord_col_names)])
 
-            query = query[:-2] + '\nFROM (\nSELECT "1" AS groupby_only_col,\n'
-            query = query + f"{self.pivot_col},\nRANK() over (ORDER BY {self.pivot_col}) AS rank\nFROM (\nSELECT DISTINCT {self.pivot_col}\n"
-            query = query + f"FROM `{self.table_name}`\n)\n)\nGROUP BY groupby_only_col\n),\n"
+        query = query[:-2] + '\nFROM (\nSELECT "1" AS groupby_only_col,\n'
+        query = query + f"{self.pivot_col},\nRANK() over (ORDER BY {self.pivot_col}) AS rank\nFROM (\nSELECT DISTINCT {self.pivot_col}\n"
+        query = query + f"FROM `{self.table_name}`\n)\n)\nGROUP BY groupby_only_col\n),\n"
 
-            return query
+        return query
 
-        def _write_long_array_aggregated(self):
-            query = ""
+    def _write_long_array_aggregated(self):
+        query = ""
 
-            # replace all self.values_col with value_col, modify table names with i
-            query = query + f"long_array_aggregated AS (\n SELECT {self.index_col},\n "
+        # replace all self.values_col with value_col, modify table names with i
+        query = query + f"long_array_aggregated AS (\n SELECT {self.index_col},\n "
+        query = query + "".join(
+            [f"ARRAY_AGG({values_col} ORDER BY rank) AS {values_col},\n" for values_col in self.values_col])[:-2]
+        query = query + f"\nFROM (\nSELECT ranked_classes_by_id.{self.index_col} AS {self.index_col},\n"
+        query = query + f"ranked_classes_by_id.rank as rank,\n"
+        query = query + "".join([f"source.{values_col} as {values_col},\n" for values_col in self.values_col])[:-2]
+        query = query + f"\n FROM `{self.table_name}` as source\n"
+        query = query + f"RIGHT JOIN (\nSELECT {self.index_col},\n {self.pivot_col},\n"
+        query = query + f"rank() over (PARTITION BY {self.index_col} ORDER BY {self.pivot_col}) as rank\n"
+        query = query + f"FROM (\n SELECT DISTINCT {self.pivot_col}\n"
+        query = query + f"FROM `{self.table_name}`)\n CROSS JOIN (\n SELECT DISTINCT {self.index_col}\n"
+        query = query + f"FROM `{self.table_name}`)\n"
+        query = query + f") as ranked_classes_by_id\n USING({self.index_col}, {self.pivot_col})\n)\nGROUP BY {self.index_col}\n)\n"
+
+        return query
+
+    def _write_table_join(self):
+
+        query = f"SELECT long_array_aggregated.{self.index_col}, \n"
+
+        for i, values_col in enumerate(self.values_col):
             query = query + "".join(
-                [f"ARRAY_AGG({values_col} ORDER BY rank) AS {values_col},\n" for values_col in self.values_col])[:-2]
-            query = query + f"\nFROM (\nSELECT ranked_classes_by_id.{self.index_col} AS {self.index_col},\n"
-            query = query + f"ranked_classes_by_id.rank as rank,\n"
-            query = query + "".join([f"source.{values_col} as {values_col},\n" for values_col in self.values_col])[:-2]
-            query = query + f"\n FROM `{self.table_name}` as source\n"
-            query = query + f"RIGHT JOIN (\nSELECT {self.index_col},\n {self.pivot_col},\n"
-            query = query + f"rank() over (PARTITION BY {self.index_col} ORDER BY {self.pivot_col}) as rank\n"
-            query = query + f"FROM (\n SELECT DISTINCT {self.pivot_col}\n"
-            query = query + f"FROM `{self.table_name}`)\n CROSS JOIN (\n SELECT DISTINCT {self.index_col}\n"
-            query = query + f"FROM `{self.table_name}`)\n"
-            query = query + f") as ranked_classes_by_id\n USING({self.index_col}, {self.pivot_col})\n)\nGROUP BY {self.index_col}\n)\n"
+                ["Long_array_aggregated.{}[ordinal({})] as {},\n".format(values_col, ord_col_name, pivot_col_name)
+                 for ord_col_name, pivot_col_name in zip(self.ord_col_names, self.piv_col_names[i])])  # values col
 
-            return query
+        # f"long_array_aggregated.{value_col}[ordinal({value for value in values_col})] as {value for value in values_col}, \n"
 
-        def _write_table_join(self):
+        query = query[:-2] + f"\nfrom "
+        #         for values_col in [self.values_col]:
+        query = query + "long_array_aggregated, "
 
-            query = f"SELECT long_array_aggregated.{self.index_col}, \n"
+        query = query + "wide_ranked"
+        return query
 
-            for i, values_col in enumerate(self.values_col):
-                query = query + "".join(
-                    ["Long_array_aggregated.{}[ordinal({})] as {},\n".format(values_col, ord_col_name, pivot_col_name)
-                     for ord_col_name, pivot_col_name in zip(self.ord_col_names, self.piv_col_names[i])])  # values col
+    # replace with new query functions
+    def generate_query(self):
+        """
+        Returns the query to create the pivoted table.
 
-            # f"long_array_aggregated.{value_col}[ordinal({value for value in values_col})] as {value for value in values_col}, \n"
+        In order to do this operation for multiple columns, we now need to iterate over the _write_long_array_aggregated function
+        Or, inside long array aggregated we need to iterate over the entire block
+        """
+        self.query = self._write_wide_ranked() + \
+                     self._write_long_array_aggregated() + \
+                     self._write_table_join()
 
-            query = query[:-2] + f"\nfrom "
-            #         for values_col in [self.values_col]:
-            query = query + "long_array_aggregated, "
-
-            query = query + "wide_ranked"
-            return query
-
-        # replace with new query functions
-        def generate_query(self):
-            """
-            Returns the query to create the pivoted table.
-
-            In order to do this operation for multiple columns, we now need to iterate over the _write_long_array_aggregated function
-            Or, inside long array aggregated we need to iterate over the entire block
-            """
-            self.query = self._write_wide_ranked() + \
-                         self._write_long_array_aggregated() + \
-                         self._write_table_join()
-
-            return self.query
+        return self.query
 
     def write_query(self, output_file=None, verbose=False):
         """
@@ -281,7 +281,8 @@ class BqPivot():
                                             destination=destination_table,
                                             use_legacy_sql=True
                                                                 )
-
+        if self.query == "":
+            self.generate_query()
         sql = self.query()
 
         # Start the query, passing in the extra configuration.
@@ -290,6 +291,7 @@ class BqPivot():
 
         print("Query results loaded to the table {}".format(table_id))
 
+    # TO DO
     #def write_temporary_table(self):
 
 
@@ -314,9 +316,9 @@ class BqPivot():
                     print('BigQuery table destination: ')
                     self.write_permanant_table(destination_table)
                     destination_table=None
-                elif answer == 't':
-                    temp_table=True
-                    self.write_temp_table()
+                # elif answer == 't':
+                #     temp_table=True
+                #     self.write_temp_table()
 
 
 
