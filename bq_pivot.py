@@ -6,17 +6,13 @@ import pandas as pd
 class BqPivot():
     """
     Class to generate a SQL query which creates pivoted tables in BigQuery.
-
     Example
     -------
-
     The following example uses the kaggle's titanic data. It can be found here -
     `https://www.kaggle.com/c/titanic/data`
-
     This data is only 60 KB and it has been used for a demonstration purpose.
     This module comes particularly handy with huge datasets for which we would need
     BigQuery(https://en.wikipedia.org/wiki/BigQuery).
-
     >>> from bq_pivot import BqPivot
     >>> import pandas as pd
     >>> data = pd.read_csv("titanic.csv").head()
@@ -24,8 +20,7 @@ class BqPivot():
                       pivot_col="Name", values_col="Age",
                       add_col_nm_suffix=False)
     >>> print(gen.generate_query())
-
-    select Pclass, Survived, PassengenId, 
+    select Pclass, Survived, PassengenId,
     sum(case when Name = "Braund, Mr. Owen Harris" then Age else 0 end) as braund_mr_owen_harris,
     sum(case when Name = "Cumings, Mrs. John Bradley (Florence Briggs Thayer)" then Age else 0 end) as cumings_mrs_john_bradley_florence_briggs_thayer,
     sum(case when Name = "Heikkinen, Miss. Laina" then Age else 0 end) as heikkinen_miss_laina,
@@ -33,65 +28,54 @@ class BqPivot():
     sum(case when Name = "Allen, Mr. William Henry" then Age else 0 end) as allen_mr_william_henry
     from <--insert-table-name-here-->
     group by 1,2,3
-    
+
     """
+
     def __init__(self, data, index_col, pivot_col, values_col, agg_fun="sum",
                  table_name=None, not_eq_default="0", add_col_nm_suffix=True, custom_agg_fun=None,
                  prefix=None, suffix=None):
         """
         Parameters
         ----------
-
         data: pandas.core.frame.DataFrame or string
             The input data can either be a pandas dataframe or a string path to the pandas
             data frame. The only requirement of this data is that it must have the column
             on which the pivot it to be done.
-
         index_col: list
             The names of the index columns in the query (the columns on which the group by needs to be performed)
-
         pivot_col: string
             The name of the column on which the pivot needs to be done.
-
-        values_col: string
-            The name of the column on which aggregation needs to be performed.
-
+        values_col: string or list of strings
+            The name or names of the columns on which aggregation needs to be performed.
         agg_fun: string
             The name of the sql aggregation function.
-
         table_name: string
             The name of the table in the query.
-
         not_eq_default: numeric, optional
             The value to take when the case when statement is not satisfied. For example,
             if one is doing a sum aggregation on the value column then the not_eq_default should
-            be equal to 0. Because the case statement part of the sql query would look like - 
-            
+            be equal to 0. Because the case statement part of the sql query would look like -
+
             ... ...
             sum(case when <pivot_col> = <some_pivot_col_value> then values_col else 0)
             ... ...
-
             Similarly if the aggregation function is min then the not_eq_default should be
             positive infinity.
-
         add_col_nm_suffix: boolean, optional
-            If True, then the original values column name will be added as suffix in the new 
+            If True, then the original values column name will be added as suffix in the new
             pivoted columns.
-
         custom_agg_fun: string, optional
-            Can be used if one wants to give customized aggregation function. The values col name 
-            should be replaced with {}. For example, if we want an aggregation function like - 
-            sum(coalesce(values_col, 0)) then the custom_agg_fun argument would be - 
-            sum(coalesce({}, 0)). 
+            Can be used if one wants to give customized aggregation function. The values col name
+            should be replaced with {}. For example, if we want an aggregation function like -
+            sum(coalesce(values_col, 0)) then the custom_agg_fun argument would be -
+            sum(coalesce({}, 0)).
             If provided this would override the agg_fun argument.
-
         prefix: string, optional
             A fixed string to add as a prefix in the pivoted column names separated by an
             underscore.
-
         suffix: string, optional
             A fixed string to add as a suffix in the pivoted column names separated by an
-            underscore.        
+            underscore.
         """
         self.query = ""
 
@@ -103,8 +87,13 @@ class BqPivot():
         self.table_name = self._get_table_name(table_name)
 
         self.piv_col_vals = self._get_piv_col_vals(data)
-        self.piv_col_names = self._create_piv_col_names(add_col_nm_suffix, prefix, suffix)
-        
+        if type(self.values_col) == str:
+            self.piv_col_names = self._create_piv_col_names(add_col_nm_suffix, prefix, suffix)
+        elif type(self.values_col) == list:
+            self.piv_col_names = []
+            for value_col in self.values_col:
+                self.piv_col_names.append(self._create_piv_col_names(add_col_nm_suffix, prefix, suffix, value_col))
+
         self.function = custom_agg_fun if custom_agg_fun else agg_fun + "({})"
 
     def _get_table_name(self, table_name):
@@ -125,19 +114,19 @@ class BqPivot():
             raise ValueError("Provided data must be a pandas dataframe or a csv file path.")
 
         if self.pivot_col not in self.data.columns:
-            raise ValueError("The provided data must have the column on which pivot is to be done. "\
-                             "Also make sure that the column name in the data is same as the name "\
+            raise ValueError("The provided data must have the column on which pivot is to be done. " \
+                             "Also make sure that the column name in the data is same as the name " \
                              "provided to the pivot_col parameter.")
 
         return self.data[self.pivot_col].astype(str).unique().tolist()
-    
+
     def _clean_col_name(self, col_name):
         """
-        The pivot column values can have arbitrary strings but in order to 
-        convert them to column names some cleaning is required. This method 
+        The pivot column values can have arbitrary strings but in order to
+        convert them to column names some cleaning is required. This method
         takes a string as input and returns a clean column name.
         """
-        
+
         # replace spaces with underscores
         # remove non alpha numeric characters other than underscores
         # replace multiple consecutive underscores with one underscore
@@ -145,16 +134,19 @@ class BqPivot():
         # remove trailing underscores
         return re.sub("_+", "_", re.sub('[^0-9a-zA-Z_]+', '', re.sub(" ", "_", col_name))).lower().rstrip("_")
 
-    def _create_piv_col_names(self, add_col_nm_suffix, prefix, suffix):
+    def _create_piv_col_names(self, add_col_nm_suffix, prefix, suffix, value_col=None):
         """
         The method created a list of pivot column names of the new pivoted table.
         """
         prefix = prefix + "_" if prefix else ""
         suffix = "_" + suffix if suffix else ""
+        if value_col == None:
+            value_col = self.values_col
 
         if add_col_nm_suffix:
-            piv_col_names = ["{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), self.values_col.lower(), suffix)
-                             for piv_col_val in self.piv_col_vals]
+            piv_col_names = [
+                "{0}{1}_{2}{3}".format(prefix, self._clean_col_name(piv_col_val), value_col.lower(), suffix)
+                for piv_col_val in self.piv_col_vals]
         else:
             piv_col_names = ["{0}{1}{2}".format(prefix, self._clean_col_name(piv_col_val), suffix)
                              for piv_col_val in self.piv_col_vals]
@@ -174,10 +166,19 @@ class BqPivot():
         """
         case_query = self.function.format("case when {0} = \"{1}\" then {2} else {3} end") + " as {4},\n"
 
-        query = "".join([case_query.format(self.pivot_col, piv_col_val, self.values_col,
-                                           self.not_eq_default, piv_col_name)
-                         for piv_col_val, piv_col_name in zip(self.piv_col_vals, self.piv_col_names)])
-        
+        if type(self.values_col) == str:
+            query = "".join([case_query.format(self.pivot_col, piv_col_val, self.values_col,
+                                               self.not_eq_default, piv_col_name)
+                             for piv_col_val, piv_col_name in zip(self.piv_col_vals, self.piv_col_names)])
+
+        elif type(self.values_col) == list:
+            query = ""
+
+            for piv_col_names, value_col in zip(self.piv_col_names, self.values_col):
+                query = query + "".join([case_query.format(self.pivot_col, piv_col_val, value_col,
+                                                           self.not_eq_default, piv_col_name)
+                                         for piv_col_val, piv_col_name in zip(self.piv_col_vals, piv_col_names)])
+
         query = query[:-2] + "\n"
         return query
 
@@ -185,7 +186,7 @@ class BqPivot():
         """
         Adds the from statement part of the query.
         """
-        query =  "from {0}\n".format(self.table_name)
+        query = "from {0}\n".format(self.table_name)
         return query
 
     def _add_group_by_statement(self):
@@ -199,17 +200,20 @@ class BqPivot():
         """
         Returns the query to create the pivoted table.
         """
-        self.query = self._add_select_statement() +\
-                     self._add_case_statement() +\
-                     self._add_from_statement() +\
+        self.query = self._add_select_statement() + \
+                     self._add_case_statement() + \
+                     self._add_from_statement() + \
                      self._add_group_by_statement()
 
         return self.query
 
-    def write_query(self, output_file):
+    def write_query(self, debug=False):  # , output_file):
         """
-        Writes the query to a text file.
+        Writes the query to a text file, or prints the query to the console if debug = True.
         """
-        text_file = open(output_file, "w")
-        text_file.write(self.generate_query())
-        text_file.close()
+        if debug == True:
+            print(self.generate_query())
+        else:
+            text_file = open(output_file, "w")
+            text_file.write(self.generate_query())
+            text_file.close()
