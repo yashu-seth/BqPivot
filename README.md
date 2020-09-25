@@ -2,15 +2,15 @@
 
 #### Google BigQuery Pivot in Python  
  
-Provides a class capable of generating a pivot query using the 'Fast Pivot' implementation, which is capable of distributing work jobs to BigQuery clusters. 'Fast Pivot' provides a roughly 10x improvement in runtime compared to the more accessible style of pivot. 
+Provides a class capable of generating a pivot query using the 'Flash Pivot' implementation, which is capable of distributing work jobs to BigQuery clusters. 'Flash Pivot' provides a roughly 10x improvement in runtime compared to the more accessible style of pivot. For example, on a dataset of roughly 100mb, the original pivot took >1 minute to complete, whereas the newly implemented 'Flash Pivot' ran in 14.3 seconds. 
 
-However, the current work would not be possible without the previous version. Credit to Yashu-Seth for implementing the original class with the traditional BigQuery Pivot. For an introduction into how that works, see [How to pivot large tables in BigQuery?](https://yashuseth.blog/2018/06/06/how-to-pivot-large-tables-in-bigquery/).
+However, the current work would not be possible without the previous version. Credit to Yashu-Seth for implementing the original class with the traditional BigQuery Pivot. For an introduction on how that works, see [How to pivot large tables in BigQuery?](https://yashuseth.blog/2018/06/06/how-to-pivot-large-tables-in-bigquery/).
 
-If you want to dig into the implementation of 'Fast Pivot', a guide can be found [here](https://corecompete.com/how-to-build-pivot-tables-in-bigquery-fast-and-easy/).
+If you want to dig into the implementation of 'Flash Pivot', a guide can be found [here](https://corecompete.com/how-to-build-pivot-tables-in-bigquery-fast-and-easy/).
 
 #### Documentation
 
-In order to access bigquery from Python, you will need to have a client instantiated. This requires the environment variable GOOGLE_APPLICATION_CREDENTIALS to be set to the path of your json keyfile. From the terminal, run the command:
+In order to access BigQuery from Python, you will need to have a client instantiated. This requires the environment variable GOOGLE_APPLICATION_CREDENTIALS to be set to the path of your google json keyfile. From the terminal, run the command:
 
 ```
 $export GOOGLE_APPLICATION_CREDENTIALS='path/to/creds.json'
